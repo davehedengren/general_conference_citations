@@ -1,8 +1,10 @@
 import streamlit as st
+st.set_page_config(layout="wide")
 import pandas as pd
 import numpy as np
 import re
 import plotly.graph_objects as go
+import plotly.express as px
 
 # --- Verse counts for each book ---
 VERSE_COUNTS = {
@@ -20,6 +22,15 @@ BOOK_LABELS = {
     'bom': 'Book of Mormon',
     'dc': 'Doctrine and Covenants',
     'pgp': 'Pearl of Great Price'
+}
+
+# --- Custom color palette for scriptures (Set2, colorblind-friendly) ---
+SCRIPTURE_COLORS = {
+    'Old Testament': px.colors.qualitative.Set2[0],
+    'New Testament': px.colors.qualitative.Set2[1],
+    'Book of Mormon': px.colors.qualitative.Set2[2],
+    'Doctrine and Covenants': px.colors.qualitative.Set2[3],
+    'Pearl of Great Price': px.colors.qualitative.Set2[4],
 }
 
 # --- Data Cleaning Helpers ---
@@ -136,7 +147,7 @@ if page == "Visualizations":
     fig = go.Figure()
     x_vals = plot_df_grouped.index.tolist()
     for col in get_display_labels(cols):
-        fig.add_trace(go.Scatter(x=x_vals, y=plot_df_grouped[col], mode='lines', name=col))
+        fig.add_trace(go.Scatter(x=x_vals, y=plot_df_grouped[col], mode='lines', name=col, line=dict(color=SCRIPTURE_COLORS.get(col))))
     if overlay_prophets:
         # Add prophet spans and offset annotations
         y_offsets = [1.0, 0.92, 0.84, 0.76, 0.68, 0.60, 0.52]  # Fraction of y-axis (top to bottom)
@@ -168,7 +179,7 @@ if page == "Visualizations":
             title="Scripture Citation Trends with Prophet Administrations",
             margin=dict(l=40, r=40, t=60, b=40)
         )
-        st.plotly_chart(fig, use_container_width=True, height=700)
+        st.plotly_chart(fig, use_container_width=False, width=1400, height=700)
         st.caption("Each point is a single conference (April or October). Prophet administrations are shown as colored backgrounds.")
     else:
         fig.update_layout(
@@ -178,7 +189,7 @@ if page == "Visualizations":
             title="Scripture Citation Trends",
             margin=dict(l=40, r=40, t=60, b=40)
         )
-        st.plotly_chart(fig, use_container_width=True, height=700)
+        st.plotly_chart(fig, use_container_width=False, width=1400, height=700)
         st.caption("Each point is a single conference (April or October). Use the sidebar to change citation type and averaging window.")
 
 elif page == "Talks & Speakers Table":
