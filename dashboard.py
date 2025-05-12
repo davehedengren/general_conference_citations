@@ -51,10 +51,10 @@ def load_data():
     df['Speaker'] = df['Speaker'].apply(clean_text)
     df['Title'] = [remove_speaker_from_title(clean_text(t), s) for t, s in zip(df['Title'], df['Speaker'])]
     df['Title'] = df['Title'].apply(clean_text)
-    # Add verse-adjusted columns
+    # Add per-100-verse columns
     for col, verses in VERSE_COUNTS.items():
         if col in df.columns:
-            df[col + '_verseadj'] = df[col] / verses
+            df[col + '_per100'] = df[col] / verses * 100
     return df
 
 df = load_data()
@@ -89,7 +89,7 @@ def get_citation_columns():
     return list(VERSE_COUNTS.keys())
 
 def get_display_labels(cols):
-    return [BOOK_LABELS.get(c.replace('_verseadj', ''), c) for c in cols]
+    return [BOOK_LABELS.get(c.replace('_per100', ''), c) for c in cols]
 
 def apply_rolling(df, window):
     group_cols = ["Year", "Month"]
@@ -107,11 +107,13 @@ if page == "Visualizations":
         cols = get_citation_columns()
         plot_df = df.copy()
     else:
-        cols = [c + "_verseadj" for c in get_citation_columns()]
+        cols = [c + "_per100" for c in get_citation_columns()]
         plot_df = df.copy()
         if not all(col in plot_df.columns for col in cols):
             st.warning("Verse-adjusted counts not available, showing raw counts.")
             cols = get_citation_columns()
+        else:
+            st.info("This view shows the number of conference citations per 100 verses in each book of scripture.")
 
     # Create Conference column (YYYY-MM)
     plot_df['Conference'] = plot_df['Year'].astype(str) + '-' + plot_df['Month'].astype(str).str.zfill(2)
@@ -130,12 +132,12 @@ if page == "Visualizations":
     plot_df_grouped = plot_df_grouped.rename(columns={c: l for c, l in zip(cols, get_display_labels(cols))})
     plot_df_grouped = plot_df_grouped.set_index("Conference")
 
+    # Always use Plotly for the main chart
+    fig = go.Figure()
+    x_vals = plot_df_grouped.index.tolist()
+    for col in get_display_labels(cols):
+        fig.add_trace(go.Scatter(x=x_vals, y=plot_df_grouped[col], mode='lines', name=col))
     if overlay_prophets:
-        # Use Plotly for custom overlays
-        fig = go.Figure()
-        x_vals = plot_df_grouped.index.tolist()
-        for col in get_display_labels(cols):
-            fig.add_trace(go.Scatter(x=x_vals, y=plot_df_grouped[col], mode='lines', name=col))
         # Add prophet spans and offset annotations
         y_offsets = [1.0, 0.92, 0.84, 0.76, 0.68, 0.60, 0.52]  # Fraction of y-axis (top to bottom)
         y_max = plot_df_grouped.max().max()
@@ -160,7 +162,7 @@ if page == "Visualizations":
                 yanchor='top'
             )
         fig.update_layout(
-            xaxis_title="Conference (YYYY-MM)",
+            xaxis_title="Conference",
             yaxis_title="Number of References",
             legend_title="Scripture",
             title="Scripture Citation Trends with Prophet Administrations",
@@ -169,7 +171,14 @@ if page == "Visualizations":
         st.plotly_chart(fig, use_container_width=True, height=700)
         st.caption("Each point is a single conference (April or October). Prophet administrations are shown as colored backgrounds.")
     else:
-        st.line_chart(plot_df_grouped[get_display_labels(cols)], height=700)
+        fig.update_layout(
+            xaxis_title="Conference",
+            yaxis_title="Number of References",
+            legend_title="Scripture",
+            title="Scripture Citation Trends",
+            margin=dict(l=40, r=40, t=60, b=40)
+        )
+        st.plotly_chart(fig, use_container_width=True, height=700)
         st.caption("Each point is a single conference (April or October). Use the sidebar to change citation type and averaging window.")
 
 elif page == "Talks & Speakers Table":
@@ -186,8 +195,8 @@ elif page == "Talks & Speakers Table":
         filtered = filtered[filtered["Year"].astype(str) == year]
     
     # Show both raw and verse-adjusted columns with readable names
-    table_cols = get_citation_columns() + [c + '_verseadj' for c in get_citation_columns()]
-    display_cols = [BOOK_LABELS[c] for c in get_citation_columns()] + [BOOK_LABELS[c] + ' (verse-adj)' for c in get_citation_columns()]
+    table_cols = get_citation_columns() + [c + '_per100' for c in get_citation_columns()]
+    display_cols = [BOOK_LABELS[c] for c in get_citation_columns()] + [BOOK_LABELS[c] + ' (per 100 verses)' for c in get_citation_columns()]
     show_cols = ["Year", "Month", "Title", "Speaker"] + table_cols
     show_display_cols = ["Year", "Month", "Title", "Speaker"] + display_cols
     table = filtered[show_cols].copy()
