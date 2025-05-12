@@ -1,0 +1,9 @@
+# Ignore Jupyter notebooks
+*.ipynb
+
+# Ignore downloaded/scraped data
+/conference_links/
+/conference_talks/
+
+# Ignore project todo list
+ todo.md 
