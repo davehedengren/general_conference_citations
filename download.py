@@ -5,6 +5,9 @@ import pandas as pd
 import time
 import argparse
 from datetime import datetime
+import re
+import glob
+from typing import Optional
 
 # --- Configuration ---
 BASE_URL = "https://www.churchofjesuschrist.org/study/general-conference/"
@@ -97,34 +100,48 @@ def parse_conference_links_to_dataframe(html_folder_path):
             html_content = f.read()
         
         soup = BeautifulSoup(html_content, 'html.parser')
-        ul_elements = soup.find_all('ul', {'class': 'subItems-iyPWM'}) # Adjusted class name based on common patterns, might need verification
-        if not ul_elements: # Try another common class if the first fails
-            ul_elements = soup.find_all('ul', {'class': 'subItems_000_subItems'})
-
-
         year_from_filename = filename.split('-')[0]
         month_from_filename = filename.split('-')[1][:2]
 
-        for ul in ul_elements:
-            for li in ul.find_all('li'):
-                a_tag = li.find('a')
-                if a_tag and a_tag.has_attr('href'):
-                    title_div = a_tag.find('div', {'class': 'itemTitle-MXhtV'}) # Adjusted class name
-                    subtitle_p = a_tag.find('p', {'class': 'subtitle-LKtQp'})   # Adjusted class name
-                    
-                    if title_div and subtitle_p:
-                        title = title_div.text.strip()
-                        speaker = subtitle_p.text.strip()
-                        talk_url_suffix = a_tag['href']
-                        
-                        all_talks_list.append({
-                            'Title': title, 
-                            'Speaker': speaker, 
-                            'URL_Suffix': talk_url_suffix,
-                            'Full_URL': "https://www.churchofjesuschrist.org" + talk_url_suffix,
-                            'Year': year_from_filename, 
-                            'Month': month_from_filename
-                        })
+        # Newer conference pages use hashed CSS class names, but the semantic markers below
+        # have been stable (e.g., <p class="primaryMeta">Speaker</p>, <p class="title">Title</p>).
+        # We'll parse talk tiles by scanning all anchors and filtering to talk URLs.
+        anchors = soup.find_all('a', href=True)
+        for a in anchors:
+            href = a.get('href', '')
+            if not isinstance(href, str):
+                continue
+
+            m = re.match(r'^/study/general-conference/(\d{4})/(\d{2})/([^/?#]+)', href)
+            if not m:
+                continue
+
+            year, month, slug = m.groups()
+
+            # Only keep the conference lists we are processing in this file, to avoid cross-links.
+            if str(year) != str(year_from_filename) or str(month) != str(month_from_filename):
+                continue
+
+            # Session tiles typically have a title but no speaker primaryMeta.
+            title_p = a.find('p', class_='title')
+            speaker_p = a.find('p', class_='primaryMeta')
+            if not title_p or not speaker_p:
+                continue
+
+            title = title_p.get_text(strip=True)
+            speaker = speaker_p.get_text(strip=True)
+            if not title or not speaker:
+                continue
+
+            talk_url_suffix = href
+            all_talks_list.append({
+                'Title': title,
+                'Speaker': speaker,
+                'URL_Suffix': talk_url_suffix,
+                'Full_URL': "https://www.churchofjesuschrist.org" + talk_url_suffix,
+                'Year': str(year_from_filename),
+                'Month': str(month_from_filename)
+            })
     
     return pd.DataFrame(all_talks_list)
 
@@ -164,7 +181,21 @@ def get_base_talk_filename(filename):
         return filename[:-len('_lang=eng.html')] + '.html'
     return filename
 
-def main(start_year, end_year, specific_conference=None):
+def _normalize_url_key(url_suffix: str) -> str:
+    """Normalize URL suffixes by stripping query params to dedupe lang variants."""
+    if not isinstance(url_suffix, str):
+        return ''
+    return url_suffix.split('?', 1)[0]
+
+def find_latest_parquet(pattern: str = "conference_talks_*.parquet") -> Optional[str]:
+    """Find the latest parquet file by modification time in the current directory."""
+    candidates = glob.glob(pattern)
+    if not candidates:
+        return None
+    candidates.sort(key=lambda p: os.path.getmtime(p), reverse=True)
+    return candidates[0]
+
+def main(start_year, end_year, specific_conference=None, merge_into_parquet: Optional[str] = None, output_parquet: Optional[str] = None):
     """
     Main function to download conference lists, individual talks,
     extract scripture citations, and save to a Parquet file.
@@ -261,20 +292,57 @@ def main(start_year, end_year, specific_conference=None):
     processed_df = processed_df.drop(columns=['base_filename'])
     print(f"DataFrame shape after deduplication: {processed_df.shape}")
 
-    # Step 5: Save to Parquet
+    # Step 5: Save to Parquet (optionally merge into an existing dataset)
     if not processed_df.empty:
         current_date_str = datetime.now().strftime("%Y-%m")
-        if specific_conference: # If a specific conference was processed, use its YYYY-MM for filename
-            output_filename = f"conference_talks_{specific_conference}.parquet"
-        else: # Otherwise, use current month
-            output_filename = f"conference_talks_{current_date_str}.parquet"
-        
-        output_filepath = os.path.join(OUTPUT_PARQUET_DIR, output_filename)
+
+        # Optional merge target can be provided via CLI args or env vars (for Streamlit Cloud / CI)
+        merge_into = (merge_into_parquet or "").strip() or os.environ.get("MERGE_INTO_PARQUET", "").strip() or None
+        output_path = (output_parquet or "").strip() or os.environ.get("OUTPUT_PARQUET", "").strip() or None
+
+        if not output_path:
+            if specific_conference:
+                output_filename = f"conference_talks_{specific_conference}.parquet"
+            else:
+                output_filename = f"conference_talks_{current_date_str}.parquet"
+            output_path = os.path.join(OUTPUT_PARQUET_DIR, output_filename)
+
         if not os.path.exists(OUTPUT_PARQUET_DIR):
             os.makedirs(OUTPUT_PARQUET_DIR)
-        
-        processed_df.to_parquet(output_filepath)
-        print(f"\nSuccessfully saved processed data to {output_filepath}")
+
+        # Add a stable URL key for deduplication (strips ?lang=eng etc.)
+        processed_df['url_key'] = processed_df['URL_Suffix'].apply(_normalize_url_key)
+        processed_df['has_lang_eng'] = processed_df['URL_Suffix'].astype(str).str.contains('lang=eng', na=False)
+        processed_df.sort_values(by=['url_key', 'has_lang_eng'], ascending=[True, False], inplace=True)
+        processed_df = processed_df.drop_duplicates(subset=['url_key'], keep='first').drop(columns=['has_lang_eng'])
+
+        if merge_into:
+            if not os.path.exists(merge_into):
+                print(f"\nMERGE_INTO_PARQUET was set but file not found: {merge_into}. Saving without merge.")
+                processed_df.drop(columns=['url_key']).to_parquet(output_path)
+                print(f"\nSuccessfully saved processed data to {output_path}")
+            else:
+                print(f"\nMerging new data into existing parquet: {merge_into}")
+                existing_df = pd.read_parquet(merge_into)
+                if 'URL_Suffix' not in existing_df.columns:
+                    print("Existing parquet missing URL_Suffix; cannot safely merge. Saving without merge.")
+                    processed_df.drop(columns=['url_key']).to_parquet(output_path)
+                    print(f"\nSuccessfully saved processed data to {output_path}")
+                else:
+                    existing_df = existing_df.copy()
+                    existing_df['url_key'] = existing_df['URL_Suffix'].apply(_normalize_url_key)
+                    existing_df['has_lang_eng'] = existing_df['URL_Suffix'].astype(str).str.contains('lang=eng', na=False)
+
+                    merged = pd.concat([existing_df, processed_df], ignore_index=True)
+                    merged.sort_values(by=['url_key', 'has_lang_eng'], ascending=[True, False], inplace=True)
+                    merged = merged.drop_duplicates(subset=['url_key'], keep='first')
+                    merged = merged.drop(columns=['url_key', 'has_lang_eng'])
+
+                    merged.to_parquet(output_path)
+                    print(f"\nSuccessfully saved merged dataset to {output_path}")
+        else:
+            processed_df.drop(columns=['url_key']).to_parquet(output_path)
+            print(f"\nSuccessfully saved processed data to {output_path}")
     else:
         print("\nNo data to save to Parquet.")
 
@@ -301,7 +369,25 @@ if __name__ == "__main__":
         default=None,
         help="Download a specific conference, e.g., '2023-10'. Overrides start_year and end_year for conference list download but uses them for historical talk processing if no talk data exists."
     )
+    parser.add_argument(
+        "--merge_into_parquet",
+        type=str,
+        default=None,
+        help="If set, merge newly processed talks into an existing parquet file (deduping by URL), and write the merged result to --output_parquet."
+    )
+    parser.add_argument(
+        "--output_parquet",
+        type=str,
+        default=None,
+        help="Output parquet path. If omitted, defaults to conference_talks_<YYYY-MM>.parquet (or conference_talks_<specific_conference>.parquet)."
+    )
     
     args = parser.parse_args()
     
-    main(start_year=args.start_year, end_year=args.end_year, specific_conference=args.specific_conference) 
+    main(
+        start_year=args.start_year,
+        end_year=args.end_year,
+        specific_conference=args.specific_conference,
+        merge_into_parquet=args.merge_into_parquet,
+        output_parquet=args.output_parquet
+    )

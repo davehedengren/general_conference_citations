@@ -7,3 +7,10 @@
 
 # Ignore project todo list
  todo.md 
+
+# Python
+__pycache__/
+.venv/
+
+# macOS
+.DS_Store

@@ -5,6 +5,8 @@ import numpy as np
 import re
 import plotly.graph_objects as go
 import plotly.express as px
+import os
+import glob
 
 # --- Verse counts for each book ---
 VERSE_COUNTS = {
@@ -57,7 +59,21 @@ def remove_speaker_from_title(title, speaker):
 # --- Load Data ---
 @st.cache_data
 def load_data():
-    df = pd.read_parquet('conference_talks_2025-05.parquet')
+    # Prefer an explicit path if provided (Streamlit Cloud secrets/env friendly),
+    # otherwise load the newest conference_talks_*.parquet in the repo.
+    explicit_path = os.environ.get("CONFERENCE_TALKS_PARQUET", "").strip() or None
+    if explicit_path and os.path.exists(explicit_path):
+        parquet_path = explicit_path
+    else:
+        candidates = glob.glob("conference_talks_*.parquet")
+        if not candidates:
+            st.error("No conference parquet found. Expected a file like conference_talks_YYYY-MM.parquet in the app directory.")
+            st.stop()
+        candidates.sort(key=lambda p: os.path.getmtime(p), reverse=True)
+        parquet_path = candidates[0]
+
+    st.sidebar.caption(f"Data file: `{parquet_path}`")
+    df = pd.read_parquet(parquet_path)
     # Clean up Title and Speaker columns
     df['Speaker'] = df['Speaker'].apply(clean_text)
     df['Title'] = [remove_speaker_from_title(clean_text(t), s) for t, s in zip(df['Title'], df['Speaker'])]
@@ -84,16 +100,22 @@ smoothing = st.sidebar.selectbox(
     ["Raw (no average)", "2-conference rolling average", "3-conference rolling average", "6-conference rolling average"]
 )
 
-# Prophet administration spans (YYYY-MM format)
-PROPHET_SPANS = [
-    ("1972-07", "1973-12", "Harold B. Lee", "#66c2a5"),
-    ("1973-12", "1985-11", "Spencer W. Kimball", "#fc8d62"),
-    ("1985-11", "1994-05", "Ezra Taft Benson", "#8da0cb"),
-    ("1994-06", "1995-03", "Howard W. Hunter", "#e78ac3"),
-    ("1995-03", "2008-01", "Gordon B. Hinckley", "#a6d854"),
-    ("2008-02", "2018-01", "Thomas S. Monson", "#ffd92f"),
-    ("2018-01", "2025-10", "Russell M. Nelson", "#e5c494"),
-]
+def _prophet_spans(max_conference: str):
+    """Prophet administration spans (YYYY-MM format). End=None means 'through latest conference in dataset'."""
+    spans = [
+        ("1972-07", "1973-12", "Harold B. Lee", "#66c2a5"),
+        ("1973-12", "1985-11", "Spencer W. Kimball", "#fc8d62"),
+        ("1985-11", "1994-05", "Ezra Taft Benson", "#8da0cb"),
+        ("1994-06", "1995-03", "Howard W. Hunter", "#e78ac3"),
+        ("1995-03", "2008-01", "Gordon B. Hinckley", "#a6d854"),
+        ("2008-02", "2018-01", "Thomas S. Monson", "#ffd92f"),
+        ("2018-01", "2025-09", "Russell M. Nelson", "#e5c494"),
+        ("2025-10", None, "Dallin H. Oaks", "#b3b3b3"),
+    ]
+    out = []
+    for start, end, prophet, color in spans:
+        out.append((start, end or max_conference, prophet, color))
+    return out
 
 # --- Helper Functions ---
 def get_citation_columns():
@@ -129,6 +151,7 @@ if page == "Visualizations":
     # Create Conference column (YYYY-MM)
     plot_df['Conference'] = plot_df['Year'].astype(str) + '-' + plot_df['Month'].astype(str).str.zfill(2)
     plot_df = plot_df.sort_values(['Year', 'Month'])
+    max_conf = plot_df['Conference'].max()
 
     # Smoothing
     if smoothing == "Raw (no average)":
@@ -152,7 +175,7 @@ if page == "Visualizations":
         # Add prophet spans and offset annotations
         y_offsets = [1.0, 0.92, 0.84, 0.76, 0.68, 0.60, 0.52]  # Fraction of y-axis (top to bottom)
         y_max = plot_df_grouped.max().max()
-        for i, (start, end, prophet, color) in enumerate(PROPHET_SPANS):
+        for i, (start, end, prophet, color) in enumerate(_prophet_spans(max_conf)):
             fig.add_vrect(
                 x0=start, x1=end,
                 fillcolor=color, opacity=0.15, line_width=0

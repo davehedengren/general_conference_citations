@@ -10,4 +10,4 @@
   - [ ] Sidebar controls for citation type (raw/verse-adjusted) and averaging (raw, 2, 3, 6 conference rolling average)
   - [ ] Visualizations page for scripture citation trends with user-selected options
   - [ ] Talks & Speakers Table page with search/filter for speaker, year, and citation breakdown
-  - [ ] Use `conference_talks_2025-05.parquet` as the data source 
+  - [ ] Auto-detect and load the newest `conference_talks_*.parquet` as the data source (or `CONFERENCE_TALKS_PARQUET` env var)
