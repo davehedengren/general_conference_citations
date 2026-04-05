@@ -37,11 +37,22 @@ SCRIPTURE_COLORS = {
 
 # --- Data Cleaning Helpers ---
 def clean_text(text):
+    """Repair mojibake + normalize whitespace.
+
+    The upstream parquet stores some rows as UTF-8 bytes that were
+    misread as Latin-1 ("Gérald" -> "GÃ©rald"). We re-encode as Latin-1
+    and decode as UTF-8 to recover the original characters. We also
+    replace non-breaking spaces (U+00A0) with regular spaces, because
+    some names appear in both forms and would otherwise be counted as
+    two distinct speakers (e.g. "Dallin H. Oaks" vs "Dallin\xa0H. Oaks").
+    """
     if pd.isnull(text):
         return text
-    # Remove common odd special characters and non-ASCII
-    text = re.sub(r'[Ââ€™"''–—€©™]', '', text)
-    text = re.sub(r'[^\x00-\x7F]+', '', text)  # Remove non-ASCII
+    try:
+        text = text.encode('latin-1').decode('utf-8')
+    except (UnicodeEncodeError, UnicodeDecodeError):
+        pass
+    text = text.replace('\u00a0', ' ')
     text = re.sub(r'\s+', ' ', text)
     return text.strip()
 
@@ -88,7 +99,7 @@ df = load_data()
 
 # --- Sidebar Controls ---
 st.sidebar.title("Conference Citations Dashboard")
-page = st.sidebar.radio("Go to", ["Visualizations", "Talks & Speakers Table"])
+page = st.sidebar.radio("Go to", ["Visualizations", "Talks & Speakers Table", "Analyses"])
 
 citation_type = st.sidebar.selectbox(
     "Citation Count Type",
@@ -243,4 +254,248 @@ elif page == "Talks & Speakers Table":
         st.subheader(f"Citation Trends for {speaker}")
         speaker_grouped = filtered.groupby("Year")[get_citation_columns()].sum().reset_index()
         speaker_grouped = speaker_grouped.rename(columns=BOOK_LABELS)
-        st.line_chart(speaker_grouped.set_index("Year")[list(BOOK_LABELS.values())]) 
+        st.line_chart(speaker_grouped.set_index("Year")[list(BOOK_LABELS.values())])
+
+elif page == "Analyses":
+    # ------------------------------------------------------------------
+    # Analyses page: one tab per deep-dive analysis under analysis/NN_*/
+    # ------------------------------------------------------------------
+    ANALYSIS_ROOT = os.path.join(os.path.dirname(__file__), "analysis")
+
+    def _read_md(folder: str) -> str:
+        path = os.path.join(ANALYSIS_ROOT, folder, "findings.md")
+        if os.path.exists(path):
+            with open(path, "r") as f:
+                return f.read()
+        return "_findings.md not found_"
+
+    def _read_csv(folder: str, name: str):
+        path = os.path.join(ANALYSIS_ROOT, folder, name)
+        return pd.read_csv(path) if os.path.exists(path) else None
+
+    st.header("Citation Pattern Analyses")
+    st.caption("Twelve exploratory analyses of the citation dataset. "
+               "Each tab renders the `findings.md` write-up plus interactive "
+               "versions of the supporting tables and charts. "
+               "See `analysis/README.md` for the cross-analysis summary.")
+
+    tab_labels = [
+        "01 · Curriculum",
+        "02 · BoM Challenges",
+        "03 · Prophet Fingerprint",
+        "04 · Speaker Decomp",
+        "05 · Clustering",
+        "06 · First Talk",
+        "07 · Session Slot",
+        "08 · Christ-Centering",
+        "09 · Verse-Adjusted",
+        "10 · Change Points",
+        "11 · Handoff",
+        "12 · Diversity",
+    ]
+    tabs = st.tabs(tab_labels)
+
+    # ----- 01 Curriculum Effect -----
+    with tabs[0]:
+        st.markdown(_read_md("01_curriculum_effect"))
+        st.subheader("Interactive: curriculum-book share over time")
+        cs = _read_csv("01_curriculum_effect", "conference_level_shares.csv")
+        if cs is not None:
+            cs = cs.sort_values(["Year", "Month"])
+            cs["Conference"] = cs["Year"].astype(str) + "-" + cs["Month"].astype(str).str.zfill(2)
+            fig = go.Figure()
+            fig.add_trace(go.Scatter(x=cs["Conference"], y=cs["curriculum_book_share"],
+                                     mode="lines+markers", name="Share of curriculum book"))
+            fig.update_layout(height=400, xaxis_title="Conference",
+                              yaxis_title="Share of citations to curriculum book")
+            st.plotly_chart(fig, use_container_width=True)
+        for name in ("curriculum_lift_2019plus.csv", "curriculum_lift_all_years.csv"):
+            d = _read_csv("01_curriculum_effect", name)
+            if d is not None:
+                st.caption(name)
+                st.dataframe(d, use_container_width=True)
+
+    # ----- 02 BoM Challenges -----
+    with tabs[1]:
+        st.markdown(_read_md("02_bom_challenges"))
+        ts = _read_csv("02_bom_challenges", "bom_share_timeseries.csv")
+        if ts is not None:
+            ts["Conference"] = ts["Year"].astype(str) + "-" + ts["Month"].astype(str).str.zfill(2)
+            fig = go.Figure()
+            fig.add_trace(go.Scatter(x=ts["Conference"], y=ts["bom_share"],
+                                     mode="lines", name="BoM share", line=dict(color="#66c2a5")))
+            # shock markers (use shapes + annotations to avoid plotly's
+            # add_vline annotation placement, which requires numeric x-axes)
+            for label, conf in (("Benson 1986-10", "1986-10"),
+                                ("Hinckley 2005-10", "2005-10"),
+                                ("Nelson 2018-10", "2018-10")):
+                fig.add_shape(type="line", x0=conf, x1=conf, xref="x",
+                              y0=0, y1=1, yref="paper",
+                              line=dict(color="red", dash="dash", width=1))
+                fig.add_annotation(x=conf, y=1.02, xref="x", yref="paper",
+                                   text=label, showarrow=False,
+                                   font=dict(size=10, color="red"))
+            fig.update_layout(height=420, xaxis_title="Conference", yaxis_title="BoM share")
+            st.plotly_chart(fig, use_container_width=True)
+        d = _read_csv("02_bom_challenges", "challenge_windows.csv")
+        if d is not None:
+            st.caption("±4-conference window means")
+            st.dataframe(d, use_container_width=True)
+
+    # ----- 03 Prophet Fingerprint -----
+    with tabs[2]:
+        st.markdown(_read_md("03_prophet_fingerprint"))
+        fps = _read_csv("03_prophet_fingerprint", "prophet_fingerprints.csv")
+        if fps is not None:
+            st.subheader("Pre-presidency personal fingerprints")
+            fig = go.Figure()
+            for _, row in fps.iterrows():
+                fig.add_trace(go.Bar(
+                    name=row["prophet"], x=list(BOOK_LABELS.values()),
+                    y=[row["bom"], row["dc"], row["pgp"], row["nt"], row["ot"]],
+                ))
+            fig.update_layout(barmode="group", height=450, yaxis_title="Share",
+                              xaxis_title="")
+            st.plotly_chart(fig, use_container_width=True)
+        sim = _read_csv("03_prophet_fingerprint", "fingerprint_similarity.csv")
+        if sim is not None:
+            st.dataframe(sim, use_container_width=True)
+
+    # ----- 04 Speaker Decomposition -----
+    with tabs[3]:
+        st.markdown(_read_md("04_speaker_decomposition"))
+        var = _read_csv("04_speaker_decomposition", "variance_decomposition.csv")
+        if var is not None:
+            st.dataframe(var, use_container_width=True)
+        yr = _read_csv("04_speaker_decomposition", "bom_share_by_year.csv")
+        if yr is not None:
+            fig = px.line(yr, x="Year", y="bom_share", markers=True,
+                          title="BoM share of all citations by year",
+                          color_discrete_sequence=[SCRIPTURE_COLORS["Book of Mormon"]])
+            fig.update_layout(height=400)
+            st.plotly_chart(fig, use_container_width=True)
+        rl = _read_csv("04_speaker_decomposition", "top_ringleaders.csv")
+        if rl is not None:
+            st.subheader("Top contributors to the late-era BoM rise")
+            fig = px.bar(rl.head(15), x="Speaker", y="contrib_vs_baseline_pp",
+                         color="bom_share", color_continuous_scale="Viridis",
+                         labels={"contrib_vs_baseline_pp": "Contribution (pp)"})
+            fig.update_layout(height=450)
+            st.plotly_chart(fig, use_container_width=True)
+            st.dataframe(rl, use_container_width=True)
+
+    # ----- 05 Speaker Clustering -----
+    with tabs[4]:
+        st.markdown(_read_md("05_speaker_clustering"))
+        centers = _read_csv("05_speaker_clustering", "cluster_centers.csv")
+        if centers is not None:
+            st.subheader("Cluster centers")
+            fig = go.Figure()
+            for _, r in centers.iterrows():
+                fig.add_trace(go.Bar(
+                    name=f"Cluster {int(r['cluster'])} (n={int(r['size'])})",
+                    x=list(BOOK_LABELS.values()),
+                    y=[r["bom"], r["dc"], r["pgp"], r["nt"], r["ot"]],
+                ))
+            fig.update_layout(barmode="group", height=420, yaxis_title="Normalized share")
+            st.plotly_chart(fig, use_container_width=True)
+        sp = _read_csv("05_speaker_clustering", "speakers_by_cluster.csv")
+        if sp is not None:
+            cluster_sel = st.selectbox("Show speakers in cluster:",
+                                       sorted(sp["cluster"].unique()))
+            st.dataframe(sp[sp["cluster"] == cluster_sel].sort_values("n_talks",
+                         ascending=False), use_container_width=True)
+
+    # ----- 06 First Talk -----
+    with tabs[5]:
+        st.markdown(_read_md("06_first_talk"))
+        ft = _read_csv("06_first_talk", "debut_vs_steady_state.csv")
+        if ft is not None:
+            fig = px.scatter(ft, x="bom_debut", y="bom_rest", hover_name="speaker",
+                             size="n_talks", color="cos_debut_vs_rest",
+                             color_continuous_scale="RdYlGn",
+                             labels={"bom_debut": "BoM share in debut talk",
+                                     "bom_rest": "BoM share in later talks"})
+            fig.add_shape(type="line", x0=0, y0=0, x1=1, y1=1,
+                          line=dict(color="gray", dash="dot"))
+            fig.update_layout(height=500)
+            st.plotly_chart(fig, use_container_width=True)
+            st.dataframe(ft, use_container_width=True)
+
+    # ----- 07 Session Slot -----
+    with tabs[6]:
+        st.markdown(_read_md("07_session_slot"))
+        m = _read_csv("07_session_slot", "by_month.csv")
+        if m is not None:
+            st.subheader("April vs October")
+            st.dataframe(m, use_container_width=True)
+        q = _read_csv("07_session_slot", "by_quartile.csv")
+        if q is not None:
+            st.subheader("Within-conference quartile")
+            st.dataframe(q, use_container_width=True)
+
+    # ----- 08 Christ-Centering -----
+    with tabs[7]:
+        st.markdown(_read_md("08_christ_centering"))
+        yr = _read_csv("08_christ_centering", "christ_index_by_year.csv")
+        if yr is not None:
+            fig = go.Figure()
+            fig.add_trace(go.Scatter(x=yr["Year"], y=yr["christ_index"],
+                                     mode="lines+markers", name="NT + BoM share",
+                                     line=dict(color="#8da0cb", width=3)))
+            fig.add_trace(go.Scatter(x=yr["Year"], y=yr["bom_share"],
+                                     mode="lines", name="BoM",
+                                     line=dict(color=SCRIPTURE_COLORS["Book of Mormon"])))
+            fig.add_trace(go.Scatter(x=yr["Year"], y=yr["nt_share"],
+                                     mode="lines", name="NT",
+                                     line=dict(color=SCRIPTURE_COLORS["New Testament"])))
+            fig.update_layout(height=450, xaxis_title="Year",
+                              yaxis_title="Share of citations",
+                              title="Christ-centering index over time")
+            st.plotly_chart(fig, use_container_width=True)
+
+    # ----- 09 Verse-Adjusted -----
+    with tabs[8]:
+        st.markdown(_read_md("09_verse_adjusted_divergence"))
+
+    # ----- 10 Change Points -----
+    with tabs[9]:
+        st.markdown(_read_md("10_change_points"))
+        cp = _read_csv("10_change_points", "change_points.csv")
+        if cp is not None:
+            book_sel = st.selectbox("Book:", sorted(cp["book"].unique()))
+            st.dataframe(cp[cp["book"] == book_sel], use_container_width=True)
+
+    # ----- 11 Handoff -----
+    with tabs[10]:
+        st.markdown(_read_md("11_prophet_handoff"))
+        tr = _read_csv("11_prophet_handoff", "transitions.csv")
+        if tr is not None:
+            fig = px.bar(tr, x="transition_at", y="delta_pp", color="delta_pp",
+                         color_continuous_scale="RdBu_r",
+                         hover_data=["outgoing", "incoming"],
+                         labels={"delta_pp": "Δ BoM share (pp)"},
+                         title="BoM share change across each transition (±8 conferences)")
+            fig.update_layout(height=420)
+            st.plotly_chart(fig, use_container_width=True)
+            st.dataframe(tr, use_container_width=True)
+
+    # ----- 12 Diversity -----
+    with tabs[11]:
+        st.markdown(_read_md("12_scripture_diversity"))
+        ent = _read_csv("12_scripture_diversity", "entropy_by_year.csv")
+        if ent is not None:
+            fig = go.Figure()
+            fig.add_trace(go.Scatter(x=ent["Year"], y=ent["mean_talk_entropy"],
+                                     mode="lines+markers", name="Mean talk entropy"))
+            fig.add_trace(go.Scatter(x=ent["Year"], y=ent["agg_entropy"],
+                                     mode="lines+markers", name="Aggregate entropy",
+                                     yaxis="y2"))
+            fig.update_layout(
+                height=450, xaxis_title="Year",
+                yaxis=dict(title="Mean per-talk entropy"),
+                yaxis2=dict(title="Aggregate entropy", overlaying="y",
+                            side="right", range=[1.8, 2.35]),
+                title="Per-talk vs aggregate Shannon entropy of citation mix",
+            )
+            st.plotly_chart(fig, use_container_width=True)
