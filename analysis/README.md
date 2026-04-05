@@ -14,7 +14,7 @@ python analysis/01_curriculum_effect/run.py
 | 01 | `01_curriculum_effect` | Does the year's book-of-study bump citations? | Null pre-2019; **+3.5 pp BoM** lift in BoM-curriculum years since CFM (2020, 2024) |
 | 02 | `02_bom_challenges` | Do BoM reading challenges move citations? | **Benson 1986 +4.6 pp, Hinckley 2005 +5.2 pp** in ±4 conf window; Nelson 2018 null at the margin (ceiling) |
 | 03 | `03_prophet_fingerprint` | Does a prophet's pre-presidency style pull the body? | **Benson (+14.8 pp) and Nelson (+9.2 pp)** — their BoM-heavy fingerprints were mirrored in conference during their tenures |
-| 04 | `04_speaker_decomposition` | Composition vs behavior? | Speaker FE R²=0.33 vs Year FE R²=0.13 → BoM rise is mostly a **generational handoff**. Ringleaders: Bednar (44 %), Renlund (47 %), Christofferson, Nelson |
+| 04 | `04_speaker_decomposition` | Composition vs behavior? | Speaker FE R²=0.33 vs Year FE R²=0.13 → BoM rise is mostly a **generational handoff**. Ringleaders: Bednar (43 %), Renlund (45 %), Christofferson, Nelson |
 | 05 | `05_speaker_clustering` | Citation "schools" among speakers? | 4 clean clusters: Restoration-centric (Benson/Eyring/Nelson), BoM+NT (Oaks/Ballard/Holland), Bible-centric (Monson/Hinckley), mid-century D&C+NT (Faust/Kimball) |
 | 06 | `06_first_talk` | Does a debut predict long-run style? | Moderate signal (r = 0.37 for BoM share); mean cos(debut, rest) = 0.71. McConkie & Petersen are the biggest drifters |
 | 07 | `07_session_slot` | April vs October, session order effects? | Null — April and October are citation-twins; position proxy too coarse |

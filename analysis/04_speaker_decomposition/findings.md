@@ -22,13 +22,13 @@ BoM share of all citations: **17.3 %** (1971-85) → **35.7 %** (2011-25). Δ = 
 
 | speaker | modern BoM share | weight | contribution (pp) |
 |---|---:|---:|---:|
-| David A. Bednar         | 44 % | 4.3 % | +1.17 |
-| Dale G. Renlund         | 47 % | 3.3 % | +0.97 |
-| D. Todd Christofferson  | 35 % | 4.9 % | +0.87 |
-| Russell M. Nelson       | 32 % | 5.4 % | +0.82 |
-| Quentin L. Cook         | 36 % | 3.3 % | +0.61 |
-| Dallin H. Oaks          | 32 % | 3.9 % | +0.57 |
-| Gerrit W. Gong          | 37 % | 2.8 % | +0.56 |
+| David A. Bednar         | 43 % | 4.5 % | +1.16 |
+| Dale G. Renlund         | 45 % | 3.5 % | +0.97 |
+| D. Todd Christofferson  | 35 % | 5.1 % | +0.89 |
+| Russell M. Nelson       | 32 % | 5.5 % | +0.82 |
+| Quentin L. Cook         | 36 % | 3.3 % | +0.63 |
+| Dallin H. Oaks          | 32 % | 4.0 % | +0.61 |
+| Gerrit W. Gong          | 35 % | 3.1 % | +0.56 |
 | Ulisses Soares          | 36 % | 2.8 % | +0.50 |
 
 Bednar and Renlund pop out as the highest per-talk BoM-citers among modern apostles who also have a substantial share of conference airtime.

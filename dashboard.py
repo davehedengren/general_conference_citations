@@ -37,11 +37,22 @@ SCRIPTURE_COLORS = {
 
 # --- Data Cleaning Helpers ---
 def clean_text(text):
+    """Repair mojibake + normalize whitespace.
+
+    The upstream parquet stores some rows as UTF-8 bytes that were
+    misread as Latin-1 ("Gérald" -> "GÃ©rald"). We re-encode as Latin-1
+    and decode as UTF-8 to recover the original characters. We also
+    replace non-breaking spaces (U+00A0) with regular spaces, because
+    some names appear in both forms and would otherwise be counted as
+    two distinct speakers (e.g. "Dallin H. Oaks" vs "Dallin\xa0H. Oaks").
+    """
     if pd.isnull(text):
         return text
-    # Remove common odd special characters and non-ASCII
-    text = re.sub(r'[Ââ€™"''–—€©™]', '', text)
-    text = re.sub(r'[^\x00-\x7F]+', '', text)  # Remove non-ASCII
+    try:
+        text = text.encode('latin-1').decode('utf-8')
+    except (UnicodeEncodeError, UnicodeDecodeError):
+        pass
+    text = text.replace('\u00a0', ' ')
     text = re.sub(r'\s+', ' ', text)
     return text.strip()
 
