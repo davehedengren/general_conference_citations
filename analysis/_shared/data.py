@@ -11,6 +11,15 @@ import pandas as pd
 REPO_ROOT = Path(__file__).resolve().parents[2]
 BOOKS = ["bom", "dc", "pgp", "nt", "ot"]
 
+# Verses per book (LDS standard editions). Static; safe to hard-code.
+VERSE_COUNTS = {
+    "ot":  23145,
+    "nt":   7957,
+    "bom":  6604,
+    "dc":   3654,
+    "pgp":   635,
+}
+
 
 def fix_mojibake(s: str) -> str:
     """Repair latin-1-as-utf-8 mojibake and normalize whitespace.

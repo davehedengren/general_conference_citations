@@ -18,7 +18,7 @@ Each analysis lives in its own numbered folder under `analysis/` with:
 - [x] 06_first_talk — Scripture distribution of each speaker's debut talk vs their steady-state.
 - [x] 07_session_slot — Month (April vs October) and year-position effects on citation mix.
 - [x] 08_christ_centering — NT+BoM share over time as a Christ-centering index; find inflection points.
-- [x] 09_verse_adjusted_divergence — (Deferred — current parquet lacks verse-adjusted columns; documented.)
+- [x] 09_verse_adjusted_divergence — Verse counts are static (LDS standard editions), so verse-adjusted counts are computed on the fly in `_shared/data.py::VERSE_COUNTS`.
 - [x] 10_change_points — Bayesian/greedy change-point detection per book; compare to known events.
 - [x] 11_prophet_handoff — 2-conference window around presidency transitions; eulogy effect test.
 - [x] 12_scripture_diversity — Shannon entropy of the 5-book mix per talk / per year; is conference getting more mono-book?

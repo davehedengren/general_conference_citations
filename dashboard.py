@@ -457,6 +457,36 @@ elif page == "Analyses":
     # ----- 09 Verse-Adjusted -----
     with tabs[8]:
         st.markdown(_read_md("09_verse_adjusted_divergence"))
+        bs = _read_csv("09_verse_adjusted_divergence", "book_summary.csv")
+        if bs is not None:
+            st.subheader("Raw share vs verse-adjusted share")
+            long = pd.melt(bs, id_vars=["book"],
+                           value_vars=["raw_share", "verse_adj_share"],
+                           var_name="metric", value_name="share")
+            long["book"] = long["book"].map(lambda b: BOOK_LABELS[b])
+            fig = px.bar(long, x="book", y="share", color="metric", barmode="group",
+                         labels={"share": "Share of citations"},
+                         color_discrete_map={"raw_share": "#8da0cb",
+                                             "verse_adj_share": "#fc8d62"})
+            fig.update_layout(height=400)
+            st.plotly_chart(fig, use_container_width=True)
+            st.dataframe(bs, use_container_width=True)
+        tilt = _read_csv("09_verse_adjusted_divergence", "speaker_density_tilt.csv")
+        if tilt is not None:
+            st.subheader("Per-speaker density tilt")
+            st.caption("A positive tilt on a book means the speaker favors it "
+                       "MORE than average once we control for book length. "
+                       "PGP tilts are largest because PGP is shortest.")
+            book_sel = st.selectbox("Book:", list(BOOK_LABELS.values()), index=2)  # BoM default
+            inv = {v: k for k, v in BOOK_LABELS.items()}
+            b = inv[book_sel]
+            col = f"{b}_tilt_pp"
+            top = tilt.sort_values(col, ascending=False).head(15)
+            fig = px.bar(top, x="Speaker", y=col,
+                         hover_data=[f"{b}_raw_share", f"{b}_va_share", "n_talks"],
+                         labels={col: f"{book_sel} tilt (pp)"})
+            fig.update_layout(height=420)
+            st.plotly_chart(fig, use_container_width=True)
 
     # ----- 10 Change Points -----
     with tabs[9]:

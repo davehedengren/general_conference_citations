@@ -19,7 +19,7 @@ python analysis/01_curriculum_effect/run.py
 | 06 | `06_first_talk` | Does a debut predict long-run style? | Moderate signal (r = 0.37 for BoM share); mean cos(debut, rest) = 0.71. McConkie & Petersen are the biggest drifters |
 | 07 | `07_session_slot` | April vs October, session order effects? | Null — April and October are citation-twins; position proxy too coarse |
 | 08 | `08_christ_centering` | Is conference more Christ-centered over time? | **NT+BoM share rose 44 % → 68 %** (1980 → 2023). Entirely BoM-driven until ~2020 |
-| 09 | `09_verse_adjusted_divergence` | Raw vs verse-adjusted style? | **Deferred** — parquet lacks verse-adjusted columns |
+| 09 | `09_verse_adjusted_divergence` | Raw vs verse-adjusted style? | **PGP dominates verse-adjusted** (415 cites/100v, 36 % of verse-adj pie from 5.5 % of raw). OT is most under-cited per verse (22/100v). Kimball, Tanner, L. Tom Perry tilt heaviest toward short books |
 | 10 | `10_change_points` | Where are the structural breaks? | BoM: 1983 (Kimball pre-Benson), 1999 (Hinckley revival), 2016 (Nelson lead-up). NT: 2021-10 surge (+8 pp) |
 | 11 | `11_prophet_handoff` | Abrupt or gradual transitions? | **No eulogy effect**. Benson transition +12 pp BoM, Nelson +3.5 pp — both immediate. Post-Benson dropoff -6 pp |
 | 12 | `12_scripture_diversity` | Are talks getting mono-book? | **Within-talk entropy up (1.06 → 1.45); between-talk aggregate entropy slightly down**. Modern talks are individually more diverse but collectively more BoM-centered |
