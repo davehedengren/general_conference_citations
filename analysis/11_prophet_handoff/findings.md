@@ -22,4 +22,8 @@
 
 **No clear "eulogy effect"** — shifts happen quickly, not gradually. Transitions to prophets with distinct personal fingerprints (Benson, Nelson) produce abrupt conference-wide swings.
 
+## Caveats
+- First transition (1972-10 Smith→Lee) has a 3-conference pre-window (truncated to dataset start) rather than 8.
+- Window ignores speakers who gave multiple talks across the transition.
+
 Artifact: `transitions.csv`.

@@ -258,7 +258,7 @@ elif page == "Analyses":
                 return f.read()
         return "_findings.md not found_"
 
-    def _read_csv(folder: str, name: str) -> pd.DataFrame | None:
+    def _read_csv(folder: str, name: str):
         path = os.path.join(ANALYSIS_ROOT, folder, name)
         return pd.read_csv(path) if os.path.exists(path) else None
 
@@ -313,12 +313,17 @@ elif page == "Analyses":
             fig = go.Figure()
             fig.add_trace(go.Scatter(x=ts["Conference"], y=ts["bom_share"],
                                      mode="lines", name="BoM share", line=dict(color="#66c2a5")))
-            # shock markers
+            # shock markers (use shapes + annotations to avoid plotly's
+            # add_vline annotation placement, which requires numeric x-axes)
             for label, conf in (("Benson 1986-10", "1986-10"),
                                 ("Hinckley 2005-10", "2005-10"),
                                 ("Nelson 2018-10", "2018-10")):
-                fig.add_vline(x=conf, line_dash="dash", line_color="red", opacity=0.5,
-                              annotation_text=label, annotation_position="top")
+                fig.add_shape(type="line", x0=conf, x1=conf, xref="x",
+                              y0=0, y1=1, yref="paper",
+                              line=dict(color="red", dash="dash", width=1))
+                fig.add_annotation(x=conf, y=1.02, xref="x", yref="paper",
+                                   text=label, showarrow=False,
+                                   font=dict(size=10, color="red"))
             fig.update_layout(height=420, xaxis_title="Conference", yaxis_title="BoM share")
             st.plotly_chart(fig, use_container_width=True)
         d = _read_csv("02_bom_challenges", "challenge_windows.csv")
