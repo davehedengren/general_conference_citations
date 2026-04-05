@@ -21,7 +21,7 @@ Each analysis lives in its own numbered folder under `analysis/` with:
 - [x] 09_verse_adjusted_divergence — (Deferred — current parquet lacks verse-adjusted columns; documented.)
 - [x] 10_change_points — Bayesian/greedy change-point detection per book; compare to known events.
 - [x] 11_prophet_handoff — 2-conference window around presidency transitions; eulogy effect test.
-- [x] 12_scripture_diversity — Shannon entropy of the 5-book mix per talk / per year; is conference getting more mono-book?
+- [x] 12_scripture_diversity — Shannon entropy of the 4-book mix (PGP excluded) per talk / per year; is conference getting more mono-book?
 
 ## Cross-cutting conventions
 

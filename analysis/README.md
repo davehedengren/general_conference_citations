@@ -22,7 +22,7 @@ python analysis/01_curriculum_effect/run.py
 | 09 | `09_verse_adjusted_divergence` | Raw vs verse-adjusted style? | **Deferred** — parquet lacks verse-adjusted columns |
 | 10 | `10_change_points` | Where are the structural breaks? | BoM: 1983 (Kimball pre-Benson), 1999 (Hinckley revival), 2016 (Nelson lead-up). NT: 2021-10 surge (+8 pp) |
 | 11 | `11_prophet_handoff` | Abrupt or gradual transitions? | **No eulogy effect**. Benson transition +12 pp BoM, Nelson +3.5 pp — both immediate. Post-Benson dropoff -6 pp |
-| 12 | `12_scripture_diversity` | Are talks getting mono-book? | **Within-talk entropy up (1.06 → 1.45); between-talk aggregate entropy slightly down**. Modern talks are individually more diverse but collectively more BoM-centered |
+| 12 | `12_scripture_diversity` | Are talks getting mono-book? | 4-book entropy (PGP excluded): **within-talk entropy up (0.95 → 1.34); between-talk aggregate entropy slightly down (1.88 → 1.84)**. Modern talks are individually more diverse but collectively more BoM-centered |
 
 ## Cross-analysis themes
 
