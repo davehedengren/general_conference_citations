@@ -35,11 +35,11 @@ Bednar and Renlund pop out as the highest per-talk BoM-citers among modern apost
 
 ## Takeaways
 - The BoM rise is **not driven by broad, uniform drift** — it is mostly a **cohort effect** from a handful of modern apostles with BoM-heavy styles.
-- Bednar (44 %) and Renlund (47 %) are the standout BoM-centric voices; Nelson and Christofferson contribute by volume as much as style.
+- Bednar (43 %) and Renlund (45 %) are the standout BoM-centric voices; Nelson and Christofferson contribute by volume as much as style.
 - This explains why the Nelson-2018 ITS showed a null share-effect (Analysis 02): the BoM share had already been lifted by these speakers before 2018.
 
 ## Caveats
 - Contribution metric is a simple Oaxaca-style decomposition; ignores interaction with talk length.
-- Name normalization is not fuzzy — the same speaker under accented/unaccented names may split (e.g., "Gérald Caussé" appears as mojibake).
+- Speaker identity is exact-match only after mojibake + NBSP normalization (see `_shared/data.py::fix_mojibake`). Any remaining spelling drift (e.g. middle-initial omitted in one talk) would still split a speaker.
 
 Artifacts: `variance_decomposition.csv`, `top_ringleaders.csv`, `bom_share_by_year.csv`.
